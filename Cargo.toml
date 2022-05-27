@@ -1,0 +1,26 @@
+[package]
+name = "procgenner"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = "0.7"
+serde = { version = "1.0.110", features = ["derive"] }
+ron = "0.7.0"
+rfd = "0.8.2"
+futures = "0.3.12"
+
+strum = "0.24"
+strum_macros = "0.24"
+
+vek = "0.15"
+petgraph = "0.6"
+paste = "1.0.7"
+
+building-blocks = "0.7.1"
+bevy_flycam = "0.7.0"
+
+bevy_egui = "0.14.0"
+egui_node_graph = { git = "https://github.com/IsseW/egui_node_graph", branch = "widget-response", features = ["persistence"] }

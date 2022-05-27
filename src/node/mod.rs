@@ -238,45 +238,46 @@ fn display(
                 NodeTemplate::FillPrimtive => {
                     let prim = eval::<Primitive>(input(0), ctx)?;
                     let fill = eval::<Fill>(input(1), ctx)?;
+                    let bounds = prim.bounds()?;
 
-                    (prim, fill)
+                    (prim, fill, bounds)
                 }
                 _ => return None,
             })
         })
         .collect();
-    let bounds: Vec<_> = fills.iter().map(|(p, _)| p.bounds()).collect();
-    let b = bounds
+
+    if let Some(b) = fills
         .iter()
         .cloned()
-        .reduce(|a, b| a.union(b))
-        .unwrap_or_default();
-
-    let extent = Extent3i::from_min_and_max(
-        PointN::<[i32; 3]>([b.min.x - 1, b.min.y - 1, b.min.z - 1]),
-        PointN::<[i32; 3]>([b.max.x + 1, b.max.y + 1, b.max.z + 1]),
-    );
-    let samples = Array3x1::fill_with(extent, |p| {
-        let p = Vec3::new(p.x(), p.y(), p.z());
-        fills
-            .iter()
-            .zip(bounds.iter())
-            .find_map(|((prim, f), b)| {
-                (b.contains_point(p) && prim.contains_at(p)).then(|| f.sample_at(p))
-            })
-            .unwrap_or_default()
-    });
-    let mut buffer = GreedyQuadsBuffer::new(extent, RIGHT_HANDED_Y_UP_CONFIG.quad_groups());
-    greedy_quads(&samples, &extent, &mut buffer);
-    let mut mesh = PosNormMesh::default();
-    for group in buffer.quad_groups.iter() {
-        for quad in group.quads.iter() {
-            group.face.add_quad_to_pos_norm_mesh(&quad, 1.0, &mut mesh);
+        .map(|(_, _, b)| b)
+        .reduce(|a, b| a.union(b)) && b.size().reduce_min() > 0 {
+        
+        let extent = Extent3i::from_min_and_max(
+            PointN::<[i32; 3]>([b.min.x - 1, b.min.y - 1, b.min.z - 1]),
+            PointN::<[i32; 3]>([b.max.x + 1, b.max.y + 1, b.max.z + 1]),
+        );
+        let samples = Array3x1::fill_with(extent, |p| {
+            let p = Vec3::new(p.x(), p.y(), p.z());
+            fills
+                .iter()
+                .find_map(|(prim, f, b)| {
+                    (b.contains_point(p) && prim.contains_at(p)).then(|| f.sample_at(p))
+                })
+                .unwrap_or_default()
+        });
+        let mut buffer = GreedyQuadsBuffer::new(extent, RIGHT_HANDED_Y_UP_CONFIG.quad_groups());
+        greedy_quads(&samples, &extent, &mut buffer);
+        let mut mesh = PosNormMesh::default();
+        for group in buffer.quad_groups.iter() {
+            for quad in group.quads.iter() {
+                group.face.add_quad_to_pos_norm_mesh(&quad, 1.0, &mut mesh);
+            }
         }
+        commands
+            .spawn_bundle(create_mesh_bundle(mesh, material.clone(), meshes))
+            .insert(GeneratedMeshMarker);
     }
-    commands
-        .spawn_bundle(create_mesh_bundle(mesh, material.clone(), meshes))
-        .insert(GeneratedMeshMarker);
 }
 
 pub fn ui(
@@ -327,11 +328,9 @@ pub fn ui(
             t.update_connection(graph, node_id);
         };
         match response {
-            NodeResponse::User(response) => {
-                match response {
-                    Response::Changed => redraw = true,
-                }
-            }
+            NodeResponse::User(response) => match response {
+                Response::Changed => redraw = true,
+            },
             NodeResponse::ConnectEventEnded(id) => {
                 let graph = &mut graph.state.graph;
                 let res = match id {

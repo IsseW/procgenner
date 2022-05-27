@@ -1,4 +1,10 @@
-#![feature(split_array, iterator_try_collect, drain_filter)]
+#![feature(
+    split_array,
+    iterator_try_collect,
+    drain_filter,
+    let_chains,
+    iterator_try_reduce
+)]
 use bevy::prelude::*;
 use bevy_flycam::PlayerPlugin;
 

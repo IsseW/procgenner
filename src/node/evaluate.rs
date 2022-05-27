@@ -310,6 +310,7 @@ impl NodeTemplate {
                 let prims = node
                     .inputs
                     .iter()
+                    .take(node.inputs.len() - 1)
                     .map(|i| eval::<Primitive>(i.1, ctx))
                     .try_collect()?;
                 vec![ValueType::from(Primitive::Union(prims))]
@@ -318,6 +319,7 @@ impl NodeTemplate {
                 let prims = node
                     .inputs
                     .iter()
+                    .take(node.inputs.len() - 1)
                     .map(|i| eval::<Primitive>(i.1, ctx))
                     .try_collect()?;
                 vec![ValueType::from(Primitive::Intersection(prims))]

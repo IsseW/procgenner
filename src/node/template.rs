@@ -370,43 +370,43 @@ pub enum Primitive {
 }
 
 impl Primitive {
-    pub fn bounds(&self) -> Aabb<i32> {
-        match self {
-            Primitive::Empty => Aabb::default(),
-            Primitive::Aabb(aabb) => *aabb,
-            Primitive::Sphere(center, radius) => Aabb {
+    pub fn bounds(&self) -> Option<Aabb<i32>> {
+        let aabb = match self {
+            Primitive::Empty => None,
+            Primitive::Aabb(aabb) => Some(*aabb),
+            Primitive::Sphere(center, radius) => Some(Aabb {
                 min: (center - radius).as_(),
                 max: (center + radius).as_(),
-            },
+            }),
             Primitive::Cylinder {
                 center,
                 radius,
                 zmin,
                 zmax,
-            } => Aabb {
+            } => Some(Aabb {
                 min: (center - radius).as_().with_z(*zmin),
                 max: (center + radius).ceil().as_().with_z(*zmax),
-            },
-            Primitive::Ramp(aabb, _) => *aabb,
+            }),
+            Primitive::Ramp(aabb, _) => Some(*aabb),
             Primitive::Union(primitives) => primitives
                 .iter()
-                .map(|p| p.bounds())
-                .reduce(|a, b| a.union(b))
-                .unwrap_or_default(),
+                .filter_map(|p| p.bounds())
+                .reduce(|a, b| a.union(b)),
             Primitive::Intersection(primitives) => primitives
                 .iter()
-                .map(|p| p.bounds())
-                .reduce(|a, b| a.intersection(b))
-                .unwrap_or_default(),
+                .filter_map(|p| p.bounds())
+                .try_reduce(|a, b| {
+                    let aabb = a.intersection(b);
+                    (aabb.size().reduce_min() > 0).then_some(aabb)
+                })
+                .flatten(),
             Primitive::Difference(primitive, _) => primitive.bounds(),
-            Primitive::Translate(primitive, trans) => {
-                let aabb = primitive.bounds();
-                Aabb {
-                    min: aabb.min + trans,
-                    max: aabb.max + trans,
-                }
-            }
-        }
+            Primitive::Translate(primitive, trans) => primitive.bounds().map(|aabb| Aabb {
+                min: aabb.min + trans,
+                max: aabb.max + trans,
+            }),
+        };
+        aabb.filter(|aabb| aabb.size().reduce_min() > 0)
     }
 
     pub fn contains_at(&self, p: Vec3<i32>) -> bool {
